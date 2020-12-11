@@ -4,6 +4,7 @@ using Unity.Jobs;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using Unity.Collections;
+using Unity.Transforms;
 
 public class BeeAttackSystem : SystemBase
 {
@@ -21,18 +22,19 @@ public class BeeAttackSystem : SystemBase
 		float deltaTime = Time.fixedDeltaTime;
 		NativeArray<BeeData> bees = beeQuery.ToComponentDataArray<BeeData>(Allocator.TempJob);
 
-		Entities.WithBurst().ForEach( (int entityInQueryIndex) => {
+		Entities.WithBurst().ForEach( (int entityInQueryIndex, in Translation beePosition) => {
 			BeeData bee = bees[entityInQueryIndex];
             if (bee.enemyTarget != null) {
 
 				BeeData enemyTarget = GetComponent<BeeData>(bee.enemyTarget);
+				float3 enemyPosition = GetComponent<Translation>(bee.enemyTarget).Value;
 				if (enemyTarget.killed)
 				{
 					bee.hasEnemy = true;
 				}
 				else
 				{
-					float3 delta = enemyTarget.position - bee.position;
+					float3 delta = enemyPosition - beePosition.Value;
 					float sqrDist = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
 					if (sqrDist > bee.attackDistance * bee.attackDistance)
 					{
@@ -44,7 +46,7 @@ public class BeeAttackSystem : SystemBase
 						bee.velocity += delta * (bee.attackForce * deltaTime / Mathf.Sqrt(sqrDist));
 						if (sqrDist < bee.hitDistance * bee.hitDistance)
 						{
-							ParticleManager.SpawnParticle(enemyTarget.position, ParticleType.Blood, bee.velocity * .35f, 2f, 6);
+							//ParticleManager.SpawnParticle(enemyPosition, ParticleType.Blood, bee.velocity * .35f, 2f, 6);
 							enemyTarget.killed = true;
 							enemyTarget.velocity *= .5f;
 							bee.hasEnemy = true;

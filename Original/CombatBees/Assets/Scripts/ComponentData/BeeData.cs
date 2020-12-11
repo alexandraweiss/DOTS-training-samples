@@ -12,24 +12,17 @@ public class BeeTeam
 
 
 public unsafe struct BeeData: IComponentData {
-	public float3 position;
 	public float3 velocity;
 	public float3 smoothPosition;
 	public float3 smoothDirection;
 	public float size;
 
 	public int teamNumber;
-	//public Bee enemyTarget;
-	//public Entity* enemyTarget;
 	public bool hasEnemy;
 	public Entity enemyTarget;
 
-
-	//public Resource resourceTarget;
-	//public Entity* resourceTarget;
-	public ResourceData* resourceTarget;
+	public Entity resourceTarget;
 	public bool canPickupResource;
-
 
 	public bool killed;
 	public float deathTimer;

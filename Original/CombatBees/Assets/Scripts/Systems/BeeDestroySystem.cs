@@ -16,7 +16,7 @@ public class BeeDestroySystem : SystemBase
         base.OnCreate();
 
 		ecbSys = World.GetOrCreateSystem<EntityCommandBufferSystem>();
-        Enabled = true;
+        Enabled = false;
     }
 
     protected override void OnUpdate()

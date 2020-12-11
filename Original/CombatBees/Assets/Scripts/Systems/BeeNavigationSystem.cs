@@ -4,6 +4,7 @@ using Unity.Jobs;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using Unity.Collections;
+using Unity.Transforms;
 
 public class BeeNavigationSystem : SystemBase
 {
@@ -13,8 +14,13 @@ public class BeeNavigationSystem : SystemBase
     {
         base.OnCreate();
 
-		beeQuery = GetEntityQuery(typeof(BeeData));
-		Enabled = true;
+		beeQuery = GetEntityQuery(new EntityQueryDesc { 
+			All = new [] {
+				ComponentType.ReadWrite<BeeData>(),
+				ComponentType.ReadWrite<Translation>(),
+			},
+		});
+		Enabled = false;
     }
 
 
@@ -25,20 +31,26 @@ public class BeeNavigationSystem : SystemBase
 
 
 		NativeArray<BeeData> bees = beeQuery.ToComponentDataArray<BeeData>(Allocator.TempJob);
+		NativeArray<Translation> beeLocations = beeQuery.ToComponentDataArray<Translation>(Allocator.TempJob);
+
 		NativeArray<BeeData> teamA = new NativeArray<BeeData>(beeCount / 2, Allocator.TempJob);
+		NativeArray<Translation> teamAPositions = new NativeArray<Translation>(beeCount / 2, Allocator.TempJob);
 		NativeArray<BeeData> teamB = new NativeArray<BeeData>(beeCount / 2, Allocator.TempJob);
+		NativeArray<Translation> teamBPositions = new NativeArray<Translation>(beeCount / 2, Allocator.TempJob);
 		int aCount = 0; 
 		int bCount = 0;
 
-		Entities.WithAll<BeeData>().ForEach((in BeeData bee) => { 
+		Entities.WithAll<BeeData>().ForEach((in BeeData bee, in Translation translation) => { 
 			if (bee.teamNumber.Equals(BeeTeam.TEAM_A))
             {
 				teamA[aCount] = bee;
+				teamAPositions[aCount] = translation;
 				aCount++;
             }
 			else
             {
 				teamB[bCount] = bee;
+				teamBPositions[bCount] = translation;
 				bCount++;
 			}
 		}).Run();
@@ -47,6 +59,8 @@ public class BeeNavigationSystem : SystemBase
 
 		Entities.WithAll<BeeData>().ForEach( (int entityInQueryIndex) => {
 			BeeData bee = bees[entityInQueryIndex];
+			Translation translation = beeLocations[entityInQueryIndex];
+
 			bee.isAttacking = false;
 			bee.isHoldingResource = false;
 			bee.canPickupResource = false;
@@ -54,32 +68,49 @@ public class BeeNavigationSystem : SystemBase
 			if (bee.killed == false)
 			{
 				BeeData attractiveFriend;
+				int attractiveFriendIndex = 0;
+				float3 attractFriendPos = float3.zero;
+
 				BeeData repellentFriend;
+				int repellentFriendIndex = 0;
+				float3 repellentFriendPos = float3.zero;
+
 				NativeArray<BeeData> enemyTeam;
+				
 				bee.velocity += new float3(UnityEngine.Random.insideUnitSphere * (bee.flightJitter * deltaTime));
 				bee.velocity *= (1f - bee.damping);
 				
 				if (bee.teamNumber.Equals(BeeTeam.TEAM_A))
 				{
-					attractiveFriend = teamA[UnityEngine.Random.Range(0, teamA.Length)];
-					repellentFriend = teamA[UnityEngine.Random.Range(0, teamA.Length)];
+					attractiveFriendIndex = UnityEngine.Random.Range(0, teamA.Length);
+					attractFriendPos = teamAPositions[attractiveFriendIndex].Value;
+					attractiveFriend = teamA[attractiveFriendIndex];
+
+					repellentFriendIndex = UnityEngine.Random.Range(0, teamB.Length);
+					repellentFriend = teamB[repellentFriendIndex];
+					repellentFriendPos = teamBPositions[repellentFriendIndex].Value;
 					enemyTeam = teamB;
 				}
 				else
 				{
-					attractiveFriend = teamB[UnityEngine.Random.Range(0, teamB.Length)];
-					repellentFriend = teamB[UnityEngine.Random.Range(0, teamB.Length)];
+					attractiveFriendIndex = UnityEngine.Random.Range(0, teamB.Length);
+					attractiveFriend = teamB[attractiveFriendIndex];
+					attractFriendPos = teamBPositions[attractiveFriendIndex].Value;
+
+					repellentFriendIndex = UnityEngine.Random.Range(0, teamA.Length);
+					repellentFriend = teamA[repellentFriendIndex];
+					repellentFriendPos = teamAPositions[repellentFriendIndex].Value;
 					enemyTeam = teamA;
 				}
 
-				float3 delta = attractiveFriend.position - bee.position;
+				float3 delta = attractFriendPos - translation.Value;
 				float dist = Mathf.Sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
 				if (dist > 0f)
 				{
 					bee.velocity += delta * (bee.teamAttraction * deltaTime / dist);
 				}
 
-				delta = attractiveFriend.position - bee.position;
+				delta = attractFriendPos - translation.Value;
 				dist = Mathf.Sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
 				if (dist > 0f)
 				{
@@ -109,7 +140,7 @@ public class BeeNavigationSystem : SystemBase
 					}
 					else
 					{
-						delta = enemyTarget.position - bee.position;
+						delta = GetComponent<Translation>(bee.enemyTarget).Value - translation.Value;
 						float sqrDist = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
 						if (sqrDist > bee.attackDistance * bee.attackDistance)
 						{
@@ -121,7 +152,7 @@ public class BeeNavigationSystem : SystemBase
 							bee.velocity += delta * (bee.attackForce * deltaTime / Mathf.Sqrt(sqrDist));
 							if (sqrDist < bee.hitDistance * bee.hitDistance)
 							{
-								ParticleManager.SpawnParticle(enemyTarget.position, ParticleType.Blood, bee.velocity * .35f, 2f, 6);
+								//ParticleManager.SpawnParticle(enemyTarget.position, ParticleType.Blood, bee.velocity * .35f, 2f, 6);
 								enemyTarget.killed = true;
 								enemyTarget.velocity *= .5f;
 								bee.hasEnemy = false;
@@ -132,10 +163,10 @@ public class BeeNavigationSystem : SystemBase
 			}
 			else
 			{
-				if (UnityEngine.Random.value < (bee.deathTimer - .5f) * .5f)
-				{
-					ParticleManager.SpawnParticle(bee.position, ParticleType.Blood, float3.zero);
-				}
+				//if (UnityEngine.Random.value < (bee.deathTimer - .5f) * .5f)
+				//{
+				//	ParticleManager.SpawnParticle(translation.Value, ParticleType.Blood, float3.zero);
+				//}
 
 				bee.velocity.y += Field.gravity * deltaTime;
 				bee.deathTimer -= deltaTime / 10f;
@@ -144,19 +175,19 @@ public class BeeNavigationSystem : SystemBase
 					bee.killed = true;
 				}
 			}
-			bee.position += deltaTime * bee.velocity;
+			translation.Value += deltaTime * bee.velocity;
 
 
-			if (math.abs(bee.position.x) > (Field.size.x * 0.5f))
+			if (math.abs(translation.Value.x) > (Field.size.x * 0.5f))
 			{
-				bee.position.x = (Field.size.x * .5f) * math.sign(bee.position.x);
+				translation.Value.x = (Field.size.x * .5f) * math.sign(translation.Value.x);
 				bee.velocity.x *= -.5f;
 				bee.velocity.y *= .8f;
 				bee.velocity.z *= .8f;
 			}
-			if (math.abs(bee.position.z) > Field.size.z * .5f)
+			if (math.abs(translation.Value.z) > Field.size.z * .5f)
 			{
-				bee.position.z = (Field.size.z * .5f) * math.sign(bee.position.z);
+				translation.Value.z = (Field.size.z * .5f) * math.sign(translation.Value.z);
 				bee.velocity.z *= -.5f;
 				bee.velocity.x *= .8f;
 				bee.velocity.y *= .8f;
@@ -167,9 +198,9 @@ public class BeeNavigationSystem : SystemBase
 				//get from resource manager or other field
 				resourceModifier = 0.75f;
 			}
-			if (math.abs(bee.position.y) > Field.size.y * .5f - resourceModifier)
+			if (math.abs(translation.Value.y) > Field.size.y * .5f - resourceModifier)
 			{
-				bee.position.y = (Field.size.y * .5f - resourceModifier) * math.sign(bee.position.y);
+				translation.Value = (Field.size.y * .5f - resourceModifier) * math.sign(translation.Value.y);
 				bee.velocity.y *= -.5f;
 				bee.velocity.z *= .8f;
 				bee.velocity.x *= .8f;
@@ -179,16 +210,22 @@ public class BeeNavigationSystem : SystemBase
 			float3 oldSmoothPos = bee.smoothPosition;
 			if (bee.isAttacking == false)
 			{
-				bee.smoothPosition = math.lerp(bee.smoothPosition, bee.position, deltaTime * bee.rotationStiffness);
+				bee.smoothPosition = math.lerp(bee.smoothPosition, translation.Value, deltaTime * bee.rotationStiffness);
 			}
 			else
 			{
-				bee.smoothPosition = bee.position;
+				bee.smoothPosition = translation.Value;
 			}
 			bee.smoothDirection = bee.smoothPosition - oldSmoothPos;
-		
+
+
+			bees[entityInQueryIndex] = bee;
+			beeLocations[entityInQueryIndex] = translation;
+
 		}).ScheduleParallel(Dependency);
 
+		bees.Dispose();
+		beeLocations.Dispose();
 		teamA.Dispose();
 		teamB.Dispose();
 		beeQuery.Dispose();
