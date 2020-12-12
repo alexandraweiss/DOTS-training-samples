@@ -20,7 +20,7 @@ public class BeeNavigationSystem : SystemBase
 				ComponentType.ReadWrite<Translation>(),
 			},
 		});
-		Enabled = false;
+		Enabled = true;
     }
 
 
@@ -28,7 +28,7 @@ public class BeeNavigationSystem : SystemBase
     {
 		float deltaTime = Time.DeltaTime;
 		int beeCount = beeQuery.CalculateEntityCount();
-
+		Unity.Mathematics.Random random = new Unity.Mathematics.Random(42);
 
 		NativeArray<BeeData> bees = beeQuery.ToComponentDataArray<BeeData>(Allocator.TempJob);
 		NativeArray<Translation> beeLocations = beeQuery.ToComponentDataArray<Translation>(Allocator.TempJob);
@@ -37,27 +37,27 @@ public class BeeNavigationSystem : SystemBase
 		NativeArray<Translation> teamAPositions = new NativeArray<Translation>(beeCount / 2, Allocator.TempJob);
 		NativeArray<BeeData> teamB = new NativeArray<BeeData>(beeCount / 2, Allocator.TempJob);
 		NativeArray<Translation> teamBPositions = new NativeArray<Translation>(beeCount / 2, Allocator.TempJob);
-		int aCount = 0; 
-		int bCount = 0;
+        int aCount = 0;
+        int bCount = 0;
 
-		Entities.WithAll<BeeData>().ForEach((in BeeData bee, in Translation translation) => { 
+		Entities.WithAll<BeeData>().WithAll<Translation>().ForEach((in BeeData bee, in Translation translation) => { 
 			if (bee.teamNumber.Equals(BeeTeam.TEAM_A))
             {
-				teamA[aCount] = bee;
-				teamAPositions[aCount] = translation;
-				aCount++;
+                teamA[aCount] = bee;
+                teamAPositions[aCount] = translation;
+                aCount++;
             }
 			else
             {
-				teamB[bCount] = bee;
-				teamBPositions[bCount] = translation;
-				bCount++;
-			}
+                teamB[bCount] = bee;
+                teamBPositions[bCount] = translation;
+                bCount++;
+            }
 		}).Run();
 
+		Dependency.Complete();
 
-
-		Entities.WithAll<BeeData>().ForEach( (int entityInQueryIndex) => {
+		var navigationJob = Entities.WithAll<BeeData>().ForEach( (int entityInQueryIndex) => {
 			BeeData bee = bees[entityInQueryIndex];
 			Translation translation = beeLocations[entityInQueryIndex];
 
@@ -68,7 +68,6 @@ public class BeeNavigationSystem : SystemBase
 			if (bee.killed == false)
 			{
 				BeeData attractiveFriend;
-				int attractiveFriendIndex = 0;
 				float3 attractFriendPos = float3.zero;
 
 				BeeData repellentFriend;
@@ -76,31 +75,31 @@ public class BeeNavigationSystem : SystemBase
 				float3 repellentFriendPos = float3.zero;
 
 				NativeArray<BeeData> enemyTeam;
-				
-				bee.velocity += new float3(UnityEngine.Random.insideUnitSphere * (bee.flightJitter * deltaTime));
+
+				bee.velocity += new float3(random.NextFloat3Direction() * (bee.flightJitter * deltaTime));
 				bee.velocity *= (1f - bee.damping);
-				
+
 				if (bee.teamNumber.Equals(BeeTeam.TEAM_A))
 				{
-					attractiveFriendIndex = UnityEngine.Random.Range(0, teamA.Length);
-					attractFriendPos = teamAPositions[attractiveFriendIndex].Value;
-					attractiveFriend = teamA[attractiveFriendIndex];
+					int attractiveFriendIndex = random.NextInt(0, teamAPositions.Length);
+                    attractFriendPos = teamAPositions[attractiveFriendIndex].Value;
+                    attractiveFriend = teamA[attractiveFriendIndex];
 
-					repellentFriendIndex = UnityEngine.Random.Range(0, teamB.Length);
-					repellentFriend = teamB[repellentFriendIndex];
-					repellentFriendPos = teamBPositions[repellentFriendIndex].Value;
-					enemyTeam = teamB;
+                    repellentFriendIndex = random.NextInt(0, teamB.Length);
+                    repellentFriend = teamB[repellentFriendIndex];
+                    repellentFriendPos = teamBPositions[repellentFriendIndex].Value;
+                    enemyTeam = teamB;
 				}
 				else
 				{
-					attractiveFriendIndex = UnityEngine.Random.Range(0, teamB.Length);
-					attractiveFriend = teamB[attractiveFriendIndex];
-					attractFriendPos = teamBPositions[attractiveFriendIndex].Value;
+					int attractiveFriendIndex = random.NextInt(0, teamB.Length);
+                    attractiveFriend = teamB[attractiveFriendIndex];
+                    attractFriendPos = teamBPositions[attractiveFriendIndex].Value;
 
-					repellentFriendIndex = UnityEngine.Random.Range(0, teamA.Length);
-					repellentFriend = teamA[repellentFriendIndex];
-					repellentFriendPos = teamAPositions[repellentFriendIndex].Value;
-					enemyTeam = teamA;
+                    repellentFriendIndex = random.NextInt(0, teamA.Length);
+                    repellentFriend = teamA[repellentFriendIndex];
+                    repellentFriendPos = teamAPositions[repellentFriendIndex].Value;
+                    enemyTeam = teamA;
 				}
 
 				float3 delta = attractFriendPos - translation.Value;
@@ -123,7 +122,7 @@ public class BeeNavigationSystem : SystemBase
 					{
 						if (enemyTeam.Length > 0)
 						{
-							BeeData enemy = enemyTeam[UnityEngine.Random.Range(0, enemyTeam.Length)];
+							BeeData enemy = enemyTeam[random.NextInt(0, enemyTeam.Length)];
 						}
 					}
 					else
@@ -176,8 +175,8 @@ public class BeeNavigationSystem : SystemBase
 				}
 			}
 			translation.Value += deltaTime * bee.velocity;
-
-
+			
+			
 			if (math.abs(translation.Value.x) > (Field.size.x * 0.5f))
 			{
 				translation.Value.x = (Field.size.x * .5f) * math.sign(translation.Value.x);
@@ -217,17 +216,33 @@ public class BeeNavigationSystem : SystemBase
 				bee.smoothPosition = translation.Value;
 			}
 			bee.smoothDirection = bee.smoothPosition - oldSmoothPos;
-
+			
 
 			bees[entityInQueryIndex] = bee;
 			beeLocations[entityInQueryIndex] = translation;
 
-		}).ScheduleParallel(Dependency);
+		}).Schedule(Dependency);
+
+		navigationJob.Complete();
+
+		var fillLists = Entities.WithName("WriteBackJob").WithAll<BeeData>().WithAll<Translation>().ForEach( (int entityInQueryIndex, ref BeeData bee, ref Translation translation) => {
+			bee = bees[entityInQueryIndex];
+			translation = beeLocations[entityInQueryIndex];
+		}).Schedule(navigationJob);
+
+		fillLists.Complete();
 
 		bees.Dispose();
 		beeLocations.Dispose();
 		teamA.Dispose();
 		teamB.Dispose();
-		beeQuery.Dispose();
+		teamAPositions.Dispose();
+		teamBPositions.Dispose();
 	}
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+		beeQuery.Dispose();
+    }
 }
