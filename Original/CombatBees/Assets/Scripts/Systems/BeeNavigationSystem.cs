@@ -174,19 +174,20 @@ public class BeeNavigationSystem : SystemBase
 					bee.killed = true;
 				}
 			}
+
 			translation.Value += deltaTime * bee.velocity;
-			
-			
-			if (math.abs(translation.Value.x) > (Field.size.x * 0.5f))
+			float toleranceFactor = bee.size * 1.5f;
+
+			if (math.abs(translation.Value.x) > (Field.size.x * 0.5f - toleranceFactor))
 			{
-				translation.Value.x = (Field.size.x * .5f) * math.sign(translation.Value.x);
+				translation.Value.x = (Field.size.x * .5f - toleranceFactor) * math.sign(translation.Value.x);
 				bee.velocity.x *= -.5f;
 				bee.velocity.y *= .8f;
 				bee.velocity.z *= .8f;
 			}
-			if (math.abs(translation.Value.z) > Field.size.z * .5f)
+			if (math.abs(translation.Value.z) > (Field.size.z * .5f - toleranceFactor))
 			{
-				translation.Value.z = (Field.size.z * .5f) * math.sign(translation.Value.z);
+				translation.Value.z = (Field.size.z * .5f - toleranceFactor) * math.sign(translation.Value.z);
 				bee.velocity.z *= -.5f;
 				bee.velocity.x *= .8f;
 				bee.velocity.y *= .8f;
@@ -197,9 +198,9 @@ public class BeeNavigationSystem : SystemBase
 				//get from resource manager or other field
 				resourceModifier = 0.75f;
 			}
-			if (math.abs(translation.Value.y) > Field.size.y * .5f - resourceModifier)
+			if (math.abs(translation.Value.y) > (Field.size.y * .5f - resourceModifier - toleranceFactor))
 			{
-				translation.Value = (Field.size.y * .5f - resourceModifier) * math.sign(translation.Value.y);
+				translation.Value.y = (Field.size.y * .5f - resourceModifier - toleranceFactor) * math.sign(translation.Value.y);
 				bee.velocity.y *= -.5f;
 				bee.velocity.z *= .8f;
 				bee.velocity.x *= .8f;
@@ -239,10 +240,4 @@ public class BeeNavigationSystem : SystemBase
 		teamAPositions.Dispose();
 		teamBPositions.Dispose();
 	}
-
-    protected override void OnDestroy()
-    {
-        base.OnDestroy();
-		beeQuery.Dispose();
-    }
 }
