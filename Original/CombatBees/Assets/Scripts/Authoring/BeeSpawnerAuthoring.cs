@@ -9,7 +9,7 @@ using Unity.Collections;
 public class BeeSpawnerAuthoring: MonoBehaviour, IConvertGameObjectToEntity, IDeclareReferencedPrefabs
 {
 	public GameObject beeTemplate;
-	public Color[] teamColors;
+	public float4[] teamColors;
 	public float minBeeSize;
 	public float maxBeeSize;
 	public float speedStretch;

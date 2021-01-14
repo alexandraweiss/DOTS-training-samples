@@ -84,7 +84,7 @@ public class ParticleManager : MonoBehaviour {
 		activeBatchSize = 0;
 
 		matProps = new MaterialPropertyBlock();
-		matProps.SetVectorArray("_Color",new Vector4[instancesPerBatch]);
+		//matProps.SetVectorArray("_Color",new Vector4[instancesPerBatch]); //TODO 
 	}
 	
 	void FixedUpdate () {
@@ -173,7 +173,7 @@ public class ParticleManager : MonoBehaviour {
 				batchSize = activeBatchSize;
 			}
 			if (batchSize > 0) {
-				matProps.SetVectorArray("_Color",colors[i]);
+				// matProps.SetVectorArray("_Color",colors[i]); //TODO 
 				Graphics.DrawMeshInstanced(particleMesh,0,particleMaterial,matrices[i],batchSize,matProps);
 			}
 		}

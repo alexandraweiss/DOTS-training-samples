@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Transforms;
+using Unity.Rendering;
 
 [UpdateInGroup(typeof(InitializationSystemGroup))]
 public class BeeSpawnerSystem : SystemBase
@@ -40,8 +41,12 @@ public class BeeSpawnerSystem : SystemBase
 				{
 					Value = size
 				});
-			}
-		
+                buff.AddComponent(spawnedBee, new BeeColour
+                {
+                    Value = beeAuthoring.teamColors[i % 2]
+                });
+            }
+
 			buff.DestroyEntity(entity);
 		}).Run();
 

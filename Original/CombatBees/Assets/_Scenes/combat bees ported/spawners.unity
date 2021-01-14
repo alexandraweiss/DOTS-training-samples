@@ -169,8 +169,14 @@ MonoBehaviour:
   beeTemplate: {fileID: 3537144584274502142, guid: 3f2a324488926ef4b9971dea1729230e,
     type: 3}
   teamColors:
-  - {r: 0, g: 0.64557576, b: 1, a: 0}
-  - {r: 1, g: 0.53020316, b: 0, a: 0}
+  - x: 1
+    y: 0
+    z: 0
+    w: 0.5
+  - x: 0
+    y: 1
+    z: 0
+    w: 0.5
   minBeeSize: 0.25
   maxBeeSize: 0.5
   speedStretch: 0.2
@@ -188,6 +194,7 @@ MonoBehaviour:
   hitDistance: 0.5
   maxSpawnSpeed: 75
   startBeeCount: 100
+  deathTimer: 0
 --- !u!1 &1303451889
 GameObject:
   m_ObjectHideFlags: 0
