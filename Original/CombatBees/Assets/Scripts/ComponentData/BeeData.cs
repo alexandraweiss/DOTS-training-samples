@@ -39,4 +39,6 @@ public unsafe struct BeeData: IComponentData {
 	public float attackDistance;
 	public float attackForce;
 	public float hitDistance;
+	public float grabDistance;
+	public float carryForce;
 }

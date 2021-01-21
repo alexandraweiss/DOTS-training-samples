@@ -29,10 +29,10 @@ public class BeeSpawnerSystem : SystemBase
 
 			for (int i = 0; i < beeAuthoring.amount; i++)
 			{
-				Entity spawnedBee = EntityManager.Instantiate(beeAuthoring.Prefab);
+				Entity spawnedBee = EntityManager.Instantiate(beeAuthoring.prefab);
 				float size = UnityEngine.Random.Range(beeAuthoring.minBeeSize, beeAuthoring.maxBeeSize);
 				float3 newPos = spawnPosition.Position + new float3(random.NextFloat(-minP.x, minP.x), random.NextFloat(-minP.y, minP.y), random.NextFloat(-minP.z, minP.z));
-				SpawnBee(beeAuthoring, spawnedBee, buff, i % 2, size);
+				SetBeeData(beeAuthoring, spawnedBee, buff, i % 2, size);
 				buff.AddComponent(spawnedBee, new Translation
 				{
 					Value = new float3(newPos)
@@ -54,9 +54,10 @@ public class BeeSpawnerSystem : SystemBase
 		buff.Dispose();
     }
 
-	protected static void SpawnBee(BeeAuthoring authoringData, Entity targetEntity, EntityCommandBuffer buff, int teamNumber, float beeSize)
+	protected static void SetBeeData(BeeAuthoring authoringData, Entity targetEntity, EntityCommandBuffer buff, int teamNumber, float beeSize)
     {
-		buff.AddComponent<BeeData>(targetEntity, new BeeData {
+		buff.AddComponent<BeeData>(targetEntity, new BeeData
+		{
 			velocity = UnityEngine.Random.insideUnitSphere * authoringData.maxSpawnSpeed,
 			size = beeSize,
 			teamNumber = teamNumber,
@@ -73,6 +74,8 @@ public class BeeSpawnerSystem : SystemBase
 			attackDistance = authoringData.attackDistance,
 			attackForce = authoringData.attackForce,
 			hitDistance = authoringData.hitDistance,
+			grabDistance = authoringData.grabDistance,
+			carryForce = authoringData.carryForce,
 		});
 	}
 }

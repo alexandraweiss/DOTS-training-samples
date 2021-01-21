@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class BeeAuthoring : IComponentData
 {
-    public Entity Prefab;
+    public Entity prefab;
 	public float4[] teamColors;
 	public float minBeeSize;
 	public float maxBeeSize;

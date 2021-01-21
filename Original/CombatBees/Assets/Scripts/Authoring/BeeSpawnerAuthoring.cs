@@ -39,7 +39,7 @@ public class BeeSpawnerAuthoring: MonoBehaviour, IConvertGameObjectToEntity, IDe
 	{
 		BeeAuthoring beeData = new BeeAuthoring
 		{
-			Prefab = conversionSystem.GetPrimaryEntity(beeTemplate),
+			prefab = conversionSystem.GetPrimaryEntity(beeTemplate),
 			teamColors = teamColors,
 			minBeeSize = minBeeSize,
 			maxBeeSize = maxBeeSize,
