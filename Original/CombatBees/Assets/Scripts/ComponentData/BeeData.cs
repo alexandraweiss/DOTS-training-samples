@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Mathematics;
 using Unity.Entities;
+using System;
 
 public class BeeTeam
 {
@@ -11,7 +12,7 @@ public class BeeTeam
 }
 
 
-public unsafe struct BeeData: IComponentData {
+public unsafe struct BeeData: IComponentData, IEquatable<BeeData> {
 	public float3 velocity;
 	public float3 smoothPosition;
 	public float3 smoothDirection;
@@ -41,4 +42,22 @@ public unsafe struct BeeData: IComponentData {
 	public float hitDistance;
 	public float grabDistance;
 	public float carryForce;
+
+    public bool Equals(BeeData other)
+    {
+		return GetHashCode() == other.GetHashCode();
+    }
+
+    public override int GetHashCode()
+    {
+		int hash = 0;
+		hash ^= teamNumber;
+		hash ^= killed? 0 : 1;
+		hash ^= hasEnemy? 0 : 1;
+		hash ^= (int)(velocity.x);
+		hash ^= (int)(velocity.y);
+		hash ^= (int)(velocity.z);
+		
+		return hash;
+    }
 }

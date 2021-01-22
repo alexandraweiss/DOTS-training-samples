@@ -52,6 +52,8 @@ public class BeeSpawnerSystem : SystemBase
 
 		buff.Playback(EntityManager);
 		buff.Dispose();
+
+		Enabled = false;
     }
 
 	protected static void SetBeeData(BeeAuthoring authoringData, Entity targetEntity, EntityCommandBuffer buff, int teamNumber, float beeSize)
