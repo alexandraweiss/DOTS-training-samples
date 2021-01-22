@@ -262,7 +262,7 @@ MonoBehaviour:
   attackForce: 500
   hitDistance: 0.5
   maxSpawnSpeed: 75
-  startBeeCount: 100
+  startBeeCount: 10
   deathTimer: 0
 --- !u!1 &1303451889
 GameObject:
