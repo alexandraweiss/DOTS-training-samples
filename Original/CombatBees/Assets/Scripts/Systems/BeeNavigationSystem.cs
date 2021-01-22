@@ -6,6 +6,7 @@ using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Transforms;
 
+[UpdateBefore(typeof(BeeAttackSystem))]
 public class BeeNavigationSystem : SystemBase
 {
 	EntityQuery beeQuery;
@@ -37,6 +38,7 @@ public class BeeNavigationSystem : SystemBase
 		float deltaTime = Time.DeltaTime;
 		int beeCount = beeQuery.CalculateEntityCount();
 		Unity.Mathematics.Random random = new Unity.Mathematics.Random(42);
+		EntityCommandBuffer ecb = new EntityCommandBuffer(Allocator.TempJob);
 
 		NativeArray<BeeData> bees = beeQuery.ToComponentDataArray<BeeData>(Allocator.TempJob);
 		NativeArray<Translation> beeLocations = beeQuery.ToComponentDataArray<Translation>(Allocator.TempJob);
@@ -49,7 +51,7 @@ public class BeeNavigationSystem : SystemBase
         int aCount = 0;
         int bCount = 0;
 
-		Entities.WithAll<BeeData>().WithAll<Translation>().ForEach( (in Entity entity, in BeeData bee, in Translation translation) => { 
+		Entities.WithName("TeamListJob").WithAll<BeeData>().ForEach( (in Entity entity, in BeeData bee, in Translation translation) => { 
 			if (bee.teamNumber.Equals(BeeTeam.TEAM_A))
             {
                 teamA[entity] = bee;
@@ -67,7 +69,7 @@ public class BeeNavigationSystem : SystemBase
 		Dependency.Complete();
 
 
-		var navigationJob = Entities.WithAll<BeeData>().ForEach( (int entityInQueryIndex, in Entity beeEntity) => {
+		var navigationJob = Entities.WithAll<BeeData>().WithReadOnly(teamA).WithReadOnly(teamB).ForEach( (int entityInQueryIndex, in Entity beeEntity) => {
 			BeeData bee = bees[entityInQueryIndex];
 			Translation translation = beeLocations[entityInQueryIndex];
 
@@ -144,6 +146,7 @@ public class BeeNavigationSystem : SystemBase
 							Entity randEnemy = enemyTeam.GetKeyArray(Allocator.Temp)[random.NextInt(0, enemyCount)];
 							if (randEnemy != Entity.Null && enemyTeam.ContainsKey(randEnemy))
 							{
+								ecb.AddComponent<BeeAttacking>(beeEntity);
 								bee.enemyTarget = randEnemy;
 								bee.hasEnemy = true;
 							}
@@ -158,36 +161,6 @@ public class BeeNavigationSystem : SystemBase
 							bee.resourceTarget = resouce;
 						}
                     }
-				}
-				else if (bee.enemyTarget != Entity.Null)
-				{
-                    BeeData enemyTarget = GetComponent<BeeData>(bee.enemyTarget);
-					if (enemyTarget.killed)
-					{
-						bee.hasEnemy = false;
-					}
-					else
-					{
-						delta = GetComponent<Translation>(bee.enemyTarget).Value - translation.Value;
-						Debug.DrawLine(translation.Value, GetComponent<Translation>(bee.enemyTarget).Value, Color.red);
-						float sqrDist = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
-						if (sqrDist > bee.attackDistance * bee.attackDistance)
-						{
-							bee.velocity += delta * (bee.chaseForce * deltaTime / Mathf.Sqrt(sqrDist));
-						}
-						else
-						{
-							bee.isAttacking = true;
-							bee.velocity += delta * (bee.attackForce * deltaTime / Mathf.Sqrt(sqrDist));
-							if (sqrDist < bee.hitDistance * bee.hitDistance)
-							{
-								//ParticleManager.SpawnParticle(enemyTarget.position, ParticleType.Blood, bee.velocity * .35f, 2f, 6);
-								enemyTarget.killed = true;
-								enemyTarget.velocity *= .5f;
-								bee.hasEnemy = false;
-							}
-						}
-					}
 				}
 				else if (bee.resourceTarget != Entity.Null)
 				{
@@ -314,15 +287,19 @@ public class BeeNavigationSystem : SystemBase
 			beeLocations[entityInQueryIndex] = translation;
 
 		}).Schedule(Dependency);
-
+		
 		navigationJob.Complete();
+
+		ecb.Playback(EntityManager);
 
 		var fillLists = Entities.WithName("WriteBackJob").WithAll<BeeData>().WithAll<Translation>().ForEach( (int entityInQueryIndex, ref BeeData bee, ref Translation translation) => {
 			bee = bees[entityInQueryIndex];
 			translation = beeLocations[entityInQueryIndex];
-		}).Schedule(navigationJob);
+		}).ScheduleParallel(navigationJob);
 
 		fillLists.Complete();
+		
+		ecb.Dispose();
 
 		bees.Dispose();
 		beeLocations.Dispose();

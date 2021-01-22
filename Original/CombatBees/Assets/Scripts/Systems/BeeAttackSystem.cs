@@ -6,6 +6,7 @@ using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Transforms;
 
+[UpdateAfter(typeof(BeeNavigationSystem))]
 public class BeeAttackSystem : SystemBase
 {
 	EntityQuery beeQuery;
@@ -13,47 +14,68 @@ public class BeeAttackSystem : SystemBase
 	protected override void OnCreate()
     {
         base.OnCreate();
-		beeQuery = GetEntityQuery(typeof(BeeData));
-		Enabled = false;
-    }
+		beeQuery = GetEntityQuery(new EntityQueryDesc
+		{
+			All = new[] {
+				ComponentType.ReadWrite<BeeData>(),
+				ComponentType.ReadWrite<Translation>(),
+				ComponentType.ReadWrite<BeeAttacking>(),
+			},
+		});
+	}
 
     protected unsafe override void OnUpdate()
     {
 		float deltaTime = Time.fixedDeltaTime;
 		NativeArray<BeeData> bees = beeQuery.ToComponentDataArray<BeeData>(Allocator.TempJob);
 
-		Entities.WithBurst().ForEach( (int entityInQueryIndex, in Translation beePosition) => {
-			BeeData bee = bees[entityInQueryIndex];
-            if (bee.enemyTarget != null) {
-
-				BeeData enemyTarget = GetComponent<BeeData>(bee.enemyTarget);
-				float3 enemyPosition = GetComponent<Translation>(bee.enemyTarget).Value;
-				if (enemyTarget.killed)
+		if (bees.Length > 0)
+		{
+			Entities.WithName("AttackJob").WithBurst().WithAll<BeeData>().WithAll<BeeAttacking>()
+				.ForEach((int entityInQueryIndex, in Translation beePosition) =>
+			{
+				BeeData bee = bees[entityInQueryIndex];
+				if (bee.enemyTarget != Entity.Null)
 				{
-					bee.hasEnemy = true;
-				}
-				else
-				{
-					float3 delta = enemyPosition - beePosition.Value;
-					float sqrDist = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
-					if (sqrDist > bee.attackDistance * bee.attackDistance)
+					BeeData enemyTarget = GetComponent<BeeData>(bee.enemyTarget);
+					float3 enemyPosition = GetComponent<Translation>(bee.enemyTarget).Value;
+					//Debug.DrawLine(beePosition.Value, enemyPosition, Color.white);
+					if (enemyTarget.killed)
 					{
-						bee.velocity += delta * (bee.chaseForce * deltaTime / Mathf.Sqrt(sqrDist));
+						bee.hasEnemy = false;
 					}
 					else
 					{
-						bee.isAttacking = true;
-						bee.velocity += delta * (bee.attackForce * deltaTime / Mathf.Sqrt(sqrDist));
-						if (sqrDist < bee.hitDistance * bee.hitDistance)
+						float3 delta = enemyPosition - beePosition.Value;
+						float sqrDist = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
+						if (sqrDist > bee.attackDistance * bee.attackDistance)
 						{
-							//ParticleManager.SpawnParticle(enemyPosition, ParticleType.Blood, bee.velocity * .35f, 2f, 6);
-							enemyTarget.killed = true;
-							enemyTarget.velocity *= .5f;
-							bee.hasEnemy = true;
+							bee.velocity += delta * (bee.chaseForce * deltaTime / Mathf.Sqrt(sqrDist));
+						}
+						else
+						{
+							//Debug.DrawLine(beePosition.Value, enemyPosition, Color.red);
+							bee.isAttacking = true;
+							bee.velocity += delta * (bee.attackForce * deltaTime / Mathf.Sqrt(sqrDist));
+							if (sqrDist < bee.hitDistance * bee.hitDistance)
+							{
+								//TODO spawn blood particles
+								enemyTarget.killed = true;
+								enemyTarget.velocity *= .5f;
+								bee.hasEnemy = true;
+							}
 						}
 					}
+
+					bees[entityInQueryIndex] = bee;
 				}
-			}
-        }).ScheduleParallel(Dependency);
+
+			}).ScheduleParallel();
+
+			Dependency.Complete();
+		}
+		
+		bees.Dispose();
+
     }
 }

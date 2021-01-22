@@ -26,6 +26,7 @@ public class BeeDestroySystem : SystemBase
 			if (bee.killed)
             {
 				ecbBuff.RemoveComponent<BeeData>(entityInQueryIndex, entity);
+				ecbBuff.RemoveComponent<BeeAttacking>(entityInQueryIndex, entity);
             }
 		}).ScheduleParallel(Dependency);
         
